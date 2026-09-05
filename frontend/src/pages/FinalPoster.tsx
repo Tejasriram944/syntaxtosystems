@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, LoaderCircle } from 'lucide-react'
+import { ArrowLeft, Download, ImageUp, LoaderCircle } from 'lucide-react'
 import { toPng } from 'html-to-image'
 import { Player } from '@remotion/player'
 import { api, type VideoExportJob } from '../lib/api'
@@ -54,6 +54,7 @@ export function FinalPoster() {
   }
   if (error) return <main className="center-message"><h1>{error}</h1><Link to="/">Back to dashboard</Link></main>
   if (!poster) return <main className="center-message">Preparing final poster…</main>
+  if (!poster.content.visual_flow?.image) return <main className="center-message"><ImageUp /><h1>Attach a Visual Flow image first</h1><Link to={`/editor/${poster.id}`}>Back to editor</Link></main>
   const videoBusy = videoJob?.status === 'queued' || videoJob?.status === 'rendering'
   return <main className="final-page"><header><Link to={`/editor/${poster.id}`}><ArrowLeft /> Back to editor</Link><div className="final-title"><span>FINAL POSTER</span><b>{poster.title}</b></div><div className="export-actions"><button className="secondary-button" onClick={download} disabled={exporting}>{exporting ? <LoaderCircle className="spin" /> : <Download />}{exporting ? 'Exporting…' : 'PNG'}</button><button className="primary-button" onClick={downloadVideo} disabled={videoBusy}>{videoBusy ? <LoaderCircle className="spin" /> : <Download />}{videoBusy ? `${Math.round((videoJob?.progress ?? 0) * 100)}%` : videoJob?.status === 'failed' ? 'Retry MP4' : 'MP4'}</button></div></header>{videoJob?.status === 'failed' && <div className="video-error">Video export failed: {videoJob.error ?? 'Please retry.'}</div>}<div className="final-stage"><div className="final-poster"><Player component={PosterVideo} inputProps={{ content: poster.content, title: poster.title }} durationInFrames={180} compositionWidth={1080} compositionHeight={1920} fps={30} controls autoPlay={!reduceMotion} loop style={{ width: '100%', height: '100%' }} /></div></div><div className="export-still" aria-hidden="true"><PosterCanvas ref={posterRef} content={poster.content} title={poster.title} motion={exportMotion} /></div></main>
 }

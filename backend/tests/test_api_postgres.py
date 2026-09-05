@@ -32,6 +32,12 @@ async def test_crud_and_revision_conflict_against_postgres():
             assert created.status_code == 201
             poster = created.json()
 
+            missing_image_export = await client.post(
+                f"/api/posters/{poster['id']}/video-exports",
+                json={"image_data_url": "data:image/png;base64," + "A" * 100},
+            )
+            assert missing_image_export.status_code == 409
+
             updated = await client.patch(
                 f"/api/posters/{poster['id']}",
                 json={"title": "Updated", "content": poster["content"], "revision": poster["revision"]},

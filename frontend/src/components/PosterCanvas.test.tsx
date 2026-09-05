@@ -14,6 +14,15 @@ describe('Poster renderer', () => {
     expect(markup).toContain('CODE PROOF')
     expect(markup).not.toContain('EXPLANATION')
     expect(markup).not.toContain('AND EXPLAIN')
+    expect(markup).toContain('flow-image-placeholder')
+  })
+
+  it('renders exactly one Visual Flow image with concept-derived alt text', () => {
+    const content = structuredClone(sampleContent)
+    content.visual_flow.image = { filename: 'flow.png', media_type: 'image/png', data_url: 'data:image/png;base64,AAAA', width: 970, height: 290 }
+    const markup = renderToStaticMarkup(<PosterCanvas content={content} title="Test" />)
+    expect(markup.match(/<img/g)).toHaveLength(1)
+    expect(markup).toContain('alt="Visual flow for Hash Table"')
   })
 
   it('splits only an exact highlight match', () => {

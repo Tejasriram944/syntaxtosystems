@@ -18,10 +18,5 @@ HASH_TABLE_CONTENT = {
     "proof": {
         "code": 'data = {\n  "name": "Alice",\n  "age": 25\n}\n\nprint(data["name"])  # Alice',
     },
-    "flow": [
-        {"title": "Key input", "detail": "\"name\" enters hash()"},
-        {"title": "Index access", "detail": "Hash points to bucket 2"},
-        {"title": "Value found", "detail": "Entry contains Alice"},
-        {"title": "Result", "detail": "data[\"name\"] → Alice"},
-    ],
+    "visual_flow": {"image": None},
 }

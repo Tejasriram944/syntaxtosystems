@@ -4,7 +4,7 @@ import { validatePoster } from './validation'
 import type { Poster } from '../types'
 
 function poster(): Poster {
-  return {
+  const value: Poster = {
     id: 'test',
     title: 'Python Hash Table',
     content: structuredClone(sampleContent),
@@ -12,17 +12,13 @@ function poster(): Poster {
     created_at: new Date(0).toISOString(),
     updated_at: new Date(0).toISOString(),
   }
+  value.content.visual_flow.image = { filename: 'flow.png', media_type: 'image/png', data_url: 'data:image/png;base64,AAAA', width: 970, height: 290 }
+  return value
 }
 
 describe('validatePoster', () => {
   it('accepts the reference poster', () => {
     expect(validatePoster(poster())).toEqual([])
-  })
-
-  it('detects repeated content across sections', () => {
-    const value = poster()
-    value.content.flow[0].detail = value.content.core.bullets[0].text
-    expect(validatePoster(value)).toContain('Remove repeated bullets or flow details.')
   })
 
   it('requires unique Core Idea keywords', () => {
@@ -40,9 +36,9 @@ describe('validatePoster', () => {
     expect(validatePoster(five)).toEqual([])
   })
 
-  it('blocks incomplete flow steps', () => {
+  it('requires one Visual Flow image', () => {
     const value = poster()
-    value.content.flow[0].detail = ''
-    expect(validatePoster(value)).toContain('Flow steps cannot be blank.')
+    value.content.visual_flow.image = null
+    expect(validatePoster(value)).toContain('Attach one Visual Flow image.')
   })
 })

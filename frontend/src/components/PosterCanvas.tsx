@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from 'react'
-import { Braces, Database, Grid3X3, Layers3, Network, ArrowDown } from 'lucide-react'
+import { Braces, Database, Grid3X3, Layers3, Network } from 'lucide-react'
 import type { CoreBullet, IconKey, PosterContent, SectionHeights } from '../types'
 import { splitHighlight } from '../lib/coreIdea'
 import { resizeAdjacent, type SectionKey } from '../lib/layout'
@@ -23,8 +23,11 @@ function NeonBorder({ color, index, motion, frame = 0 }: { color: string; index:
   </svg>
 }
 
-export const PosterCanvas = forwardRef<HTMLDivElement, { content: PosterContent; title: string; motion?: PosterMotion; frame?: number }>(function PosterCanvas({ content, title, motion = 'loop', frame = 0 }, ref) {
+type PosterCanvasProps = { content: PosterContent; title: string; motion?: PosterMotion; frame?: number; visualFlowImageSrc?: string | null; onVisualFlowImageError?: () => void }
+
+export const PosterCanvas = forwardRef<HTMLDivElement, PosterCanvasProps>(function PosterCanvas({ content, title, motion = 'loop', frame = 0, visualFlowImageSrc, onVisualFlowImageError }, ref) {
   const ConceptIcon = icons[content.concept.icon as IconKey] ?? Grid3X3
+  const flowImageSrc = visualFlowImageSrc === undefined ? content.visual_flow?.image?.data_url : visualFlowImageSrc
   return <div className="poster-canvas" ref={ref} data-poster-title={title}>
     <header className="poster-header" data-animate="header">
       <div className="python-mark"><span>⌁</span><span>⌁</span></div>
@@ -49,7 +52,10 @@ export const PosterCanvas = forwardRef<HTMLDivElement, { content: PosterContent;
     <section className="poster-section flow-section" style={{ height: content.section_heights.flow }} id="poster-flow" data-animate="section">
       <NeonBorder color="#11d8ff" index={3} motion={motion} frame={frame} />
       <div className="section-heading"><h2>VISUAL FLOW</h2></div>
-      <div className="flow-row">{content.flow.map((step, index) => <div className="flow-wrap" key={`${step.title}-${index}`}><div className="flow-card"><b>{index + 1}. {step.title}</b><ArrowDown aria-hidden="true" /><span>{step.detail}</span></div>{index < content.flow.length - 1 && <span className="flow-arrow">→</span>}</div>)}</div>
+      <div className="flow-image-slot">{flowImageSrc
+        ? <img src={flowImageSrc} alt={`Visual flow for ${content.concept.title}`} onError={onVisualFlowImageError} />
+        : <div className="flow-image-placeholder">Attach one Visual Flow image in the editor</div>}
+      </div>
     </section>
     <footer><span>PYTHON {content.level}</span><i>•</i><span>{content.eyebrow}</span><i>•</i><span>EASY TO UNDERSTAND</span><b>9:16&nbsp; • &nbsp;1080 × 1920</b></footer>
   </div>
@@ -57,7 +63,7 @@ export const PosterCanvas = forwardRef<HTMLDivElement, { content: PosterContent;
 
 const HANDLE_PAIRS: [SectionKey, SectionKey][] = [['concept', 'core'], ['core', 'proof'], ['proof', 'flow']]
 
-export function PosterPreview({ content, title, className = '', onHeightsChange }: { content: PosterContent; title: string; className?: string; onHeightsChange?: (heights: SectionHeights) => void }) {
+export function PosterPreview({ content, title, className = '', onHeightsChange, visualFlowImageSrc, onVisualFlowImageError }: { content: PosterContent; title: string; className?: string; onHeightsChange?: (heights: SectionHeights) => void; visualFlowImageSrc?: string | null; onVisualFlowImageError?: () => void }) {
   const frameRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.35)
   useEffect(() => {
@@ -88,7 +94,7 @@ export function PosterPreview({ content, title, className = '', onHeightsChange 
     onHeightsChange(resizeAdjacent(content.section_heights, upper, lower, event.key === 'ArrowDown' ? 5 : -5))
   }
   return <div className={`poster-frame ${className}`} ref={frameRef}>
-    <div style={{ transform: `scale(${scale})` }}><PosterCanvas content={content} title={title} /></div>
+    <div style={{ transform: `scale(${scale})` }}><PosterCanvas content={content} title={title} visualFlowImageSrc={visualFlowImageSrc} onVisualFlowImageError={onVisualFlowImageError} /></div>
     {onHeightsChange && tops.map((top, index) => <button type="button" key={index} className="section-resizer" style={{ top: `${top / 19.2}%` }} role="separator" aria-orientation="horizontal" aria-label={`Resize ${HANDLE_PAIRS[index][0]} and ${HANDLE_PAIRS[index][1]} sections`} aria-valuenow={content.section_heights[HANDLE_PAIRS[index][0]]} onPointerDown={(event) => startResize(event, index)} onKeyDown={(event) => keyboardResize(event, index)}><span /></button>)}
   </div>
 }

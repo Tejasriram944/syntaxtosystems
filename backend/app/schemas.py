@@ -1,13 +1,15 @@
+import base64
+import binascii
 from datetime import datetime
+from io import BytesIO
 from typing import Literal
 from uuid import UUID
 
+from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
-class FlowStep(BaseModel):
-    title: str = Field(min_length=1, max_length=28)
-    detail: str = Field(min_length=1, max_length=52)
+MAX_VISUAL_FLOW_BYTES = 5 * 1024 * 1024
+MAX_VISUAL_FLOW_DIMENSION = 4096
 
 
 class ConceptSection(BaseModel):
@@ -85,6 +87,52 @@ class ProofSection(BaseModel):
         return value
 
 
+class VisualFlowImage(BaseModel):
+    filename: str = Field(min_length=1, max_length=160)
+    media_type: Literal["image/png", "image/jpeg", "image/webp"]
+    data_url: str = Field(min_length=32, max_length=7_000_000)
+    width: int = Field(ge=1, le=MAX_VISUAL_FLOW_DIMENSION)
+    height: int = Field(ge=1, le=MAX_VISUAL_FLOW_DIMENSION)
+
+    @field_validator("filename")
+    @classmethod
+    def validate_filename(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Image filename cannot be blank")
+        return value
+
+    @model_validator(mode="after")
+    def validate_image_data(self):
+        expected_prefix = f"data:{self.media_type};base64,"
+        if not self.data_url.startswith(expected_prefix):
+            raise ValueError("Image data URL does not match its media type")
+        try:
+            raw = base64.b64decode(self.data_url[len(expected_prefix):], validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError("Visual Flow image contains invalid base64 data") from exc
+        if len(raw) > MAX_VISUAL_FLOW_BYTES:
+            raise ValueError("Visual Flow image must be 5 MB or smaller")
+        expected_format = {"image/png": "PNG", "image/jpeg": "JPEG", "image/webp": "WEBP"}[self.media_type]
+        try:
+            with Image.open(BytesIO(raw)) as image:
+                actual_size = image.size
+                actual_format = image.format
+                image.verify()
+        except (UnidentifiedImageError, OSError, ValueError) as exc:
+            raise ValueError("Visual Flow image is corrupted or unsupported") from exc
+        if actual_format != expected_format:
+            raise ValueError("Visual Flow image bytes do not match the selected format")
+        if actual_size != (self.width, self.height):
+            raise ValueError("Visual Flow image dimensions do not match the file")
+        if max(actual_size) > MAX_VISUAL_FLOW_DIMENSION:
+            raise ValueError("Visual Flow image dimensions cannot exceed 4096 pixels")
+        return self
+
+
+class VisualFlowSection(BaseModel):
+    image: VisualFlowImage | None = None
+
+
 class SectionHeights(BaseModel):
     concept: int = Field(ge=180)
     core: int = Field(ge=280)
@@ -106,20 +154,21 @@ class PosterContent(BaseModel):
     concept: ConceptSection
     core: CoreSection
     proof: ProofSection
-    flow: list[FlowStep] = Field(min_length=2, max_length=4)
+    visual_flow: VisualFlowSection = Field(default_factory=VisualFlowSection)
 
-    @field_validator("flow")
+    @model_validator(mode="before")
     @classmethod
-    def validate_flow(cls, values: list[FlowStep]) -> list[FlowStep]:
-        titles = [step.title for step in values]
-        validate_unique_strings(titles, 28)
-        return values
+    def normalize_legacy_visual_flow(cls, value):
+        if not isinstance(value, dict):
+            return value
+        data = dict(value)
+        data.setdefault("visual_flow", {"image": None})
+        return data
 
     @model_validator(mode="after")
     def reject_repeated_explanations(self):
         prose = [
             *(bullet.text for bullet in self.core.bullets),
-            *(step.detail for step in self.flow),
         ]
         normalized = [" ".join(value.lower().split()).rstrip(".!?") for value in prose]
         if len(normalized) != len(set(normalized)):

@@ -118,11 +118,14 @@ async def renderer_request(method: str, path: str, **kwargs) -> httpx.Response:
 @app.post("/api/posters/{poster_id}/video-exports", response_model=VideoExportJob, status_code=202)
 async def start_video_export(poster_id: UUID, payload: VideoExportCreate, db: AsyncSession = Depends(get_db)):
     poster = await get_poster_or_404(poster_id, db)
+    content = PosterResponse.model_validate(poster).content
+    if content.visual_flow.image is None:
+        raise HTTPException(status_code=409, detail="Attach a Visual Flow image before exporting video")
     job_id = uuid4()
     response = await renderer_request("POST", "/renders", json={
         "job_id": str(job_id),
         "title": poster.title,
-        "content": PosterResponse.model_validate(poster).content.model_dump(mode="json"),
+        "content": content.model_dump(mode="json"),
         "image_data_url": payload.image_data_url,
     })
     return response.json()
